@@ -13,19 +13,26 @@ const authMiddleware = require("./middleware/auth");
 
 const app = express();
 
-// CORS Configuration
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://grocery-frontend-orcin.vercel.app"
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Robust CORS Handling for Vercel
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // Allow any origin that is localhost or a vercel.app domain
+  if (origin && (origin.includes("localhost") || origin.endsWith(".vercel.app"))) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-app.options('*', cors()); // Handle preflight requests
+  // Immediately respond to preflight requests
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
+
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
