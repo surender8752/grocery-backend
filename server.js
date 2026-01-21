@@ -12,8 +12,20 @@ const Admin = require("./models/Admin");
 const authMiddleware = require("./middleware/auth");
 
 const app = express();
-app.use(cors());
+
+// CORS Configuration
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://grocery-frontend-ocon.vercel.app"
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
