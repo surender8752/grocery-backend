@@ -83,6 +83,43 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Diagnostic DB Test
+app.get("/test-db", async (req, res) => {
+  try {
+    const uri = process.env.MONGO_URI || "";
+    const maskedUri = uri ? `${uri.substring(0, 15)}...${uri.substring(uri.length - 5)}` : "MISSING";
+
+    // Attempt a direct ping/connection check
+    const status = mongoose.connection.readyState;
+    const states = { 0: "Disconnected", 1: "Connected", 2: "Connecting", 3: "Disconnecting" };
+
+    if (status === 1) {
+      return res.json({
+        success: true,
+        message: "Database is already connected!",
+        uriStatus: maskedUri !== "MISSING" ? "URI exists" : "URI missing"
+      });
+    }
+
+    // Try a direct connect with short timeout
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
+
+    res.json({
+      success: true,
+      message: "Direct connection attempt successful!",
+      uri: maskedUri
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      code: err.code,
+      details: "If you see 'IP not whitelisted', go to MongoDB Atlas -> Network Access and add 0.0.0.0/0",
+      uriPrefix: process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 10) : "empty"
+    });
+  }
+});
+
 // ========== ADMIN AUTHENTICATION ==========
 
 // Register Admin
