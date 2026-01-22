@@ -217,7 +217,7 @@ app.post("/admin/login", checkDbConnection, async (req, res) => {
 });
 
 // Get Admin Profile (Protected)
-app.get("/admin/profile", authMiddleware, async (req, res) => {
+app.get("/admin/profile", authMiddleware, checkDbConnection, async (req, res) => {
   try {
     const admin = await Admin.findById(req.admin.id).select("-password");
     res.json(admin);
