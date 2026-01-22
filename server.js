@@ -182,7 +182,7 @@ app.get("/product/:id", async (req, res) => {
 // Add Product (Protected)
 app.post("/product", authMiddleware, async (req, res) => {
   try {
-    const { name, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     // Validation
     if (!name || !quantity || price === undefined || !expiryDate || !notifyBeforeDays) {
@@ -191,6 +191,7 @@ app.post("/product", authMiddleware, async (req, res) => {
 
     const product = await Product.create({
       name,
+      category,
       quantity,
       price,
       expiryDate,
@@ -206,11 +207,11 @@ app.post("/product", authMiddleware, async (req, res) => {
 // Update Product (Protected)
 app.put("/product/:id", authMiddleware, async (req, res) => {
   try {
-    const { name, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, quantity, price, expiryDate, notifyBeforeDays },
+      { name, category, quantity, price, expiryDate, notifyBeforeDays },
       { new: true, runValidators: true }
     );
 
