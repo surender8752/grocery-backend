@@ -51,25 +51,54 @@ if (!MONGO_URI) {
 // Optimization for Serverless (Vercel)
 mongoose.set("bufferCommands", false);
 
-mongoose
-  .connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 5000, // Fail after 5 seconds instead of 10
-  })
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:");
-    console.error(err.message);
-  });
+let cached = global.mongoose;
 
-// Middleware to check DB connection
-const checkDbConnection = (req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      error: "Database not connected",
-      details: "The server is running but cannot reach MongoDB. Please check your MONGO_URI and IP Whitelist."
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      serverSelectionTimeoutMS: 5000,
+    };
+
+    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+      console.log("✅ MongoDB Connected");
+      return mongoose;
+    }).catch((err) => {
+      console.error("❌ MongoDB Connection Error:", err.message);
+      throw err;
     });
   }
-  next();
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+// Middleware to ensure DB connection
+const checkDbConnection = async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection failed in middleware:", error);
+    return res.status(503).json({
+      error: "Database not connected",
+      details: "The server failed to connect to MongoDB. Please check MONGO_URI and IP Whitelist.",
+      reason: error.message
+    });
+  }
 };
 
 // Health Check
