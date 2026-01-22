@@ -31,6 +31,10 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/", (req, res) => {
+  res.send("🚀 SK Inventory Backend is Running!");
+});
+
 app.use(express.json());
 
 
@@ -38,10 +42,31 @@ app.use(express.json());
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 // MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  console.error("❌ CRITICAL: MONGO_URI is not defined in environment variables!");
+}
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err));
+  .catch((err) => {
+    console.error("❌ MongoDB Connection Error DETAILS:");
+    console.error("Message:", err.message);
+    console.error("Code:", err.code);
+  });
+
+// Health Check
+app.get("/health", (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "Connected" : "Disconnected";
+  res.json({
+    status: "ok",
+    database: dbStatus,
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV
+  });
+});
 
 // ========== ADMIN AUTHENTICATION ==========
 
@@ -149,7 +174,7 @@ app.get("/admin/profile", authMiddleware, async (req, res) => {
     const admin = await Admin.findById(req.admin.id).select("-password");
     res.json(admin);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch profile" });
+    res.status(500).json({ error: "Failed to fetch profile", details: error.message });
   }
 });
 
@@ -175,7 +200,7 @@ app.get("/product/:id", async (req, res) => {
     }
     res.json(product);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch product" });
+    res.status(500).json({ error: "Failed to fetch product", details: error.message });
   }
 });
 
@@ -200,7 +225,7 @@ app.post("/product", authMiddleware, async (req, res) => {
 
     res.status(201).json({ message: "Product Added", product });
   } catch (error) {
-    res.status(500).json({ error: "Failed to add product" });
+    res.status(500).json({ error: "Failed to add product", details: error.message });
   }
 });
 
@@ -221,7 +246,7 @@ app.put("/product/:id", authMiddleware, async (req, res) => {
 
     res.json({ message: "Product Updated", product });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update product" });
+    res.status(500).json({ error: "Failed to update product", details: error.message });
   }
 });
 
@@ -236,7 +261,7 @@ app.delete("/product/:id", authMiddleware, async (req, res) => {
 
     res.json({ message: "Product Deleted" });
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete product" });
+    res.status(500).json({ error: "Failed to delete product", details: error.message });
   }
 });
 
