@@ -94,7 +94,7 @@ app.post("/admin/register", async (req, res) => {
     });
   } catch (error) {
     console.error("Register error:", error);
-    res.status(500).json({ error: "Failed to register admin" });
+    res.status(500).json({ error: "Failed to register admin", details: error.message });
   }
 });
 
@@ -139,7 +139,7 @@ app.post("/admin/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "Failed to login" });
+    res.status(500).json({ error: "Failed to login", details: error.message });
   }
 });
 
@@ -161,7 +161,8 @@ app.get("/products", async (req, res) => {
     const products = await Product.find().sort({ expiryDate: 1 });
     res.json(products);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch products" });
+    console.error("Fetch products error:", error);
+    res.status(500).json({ error: "Failed to fetch products", details: error.message });
   }
 });
 
