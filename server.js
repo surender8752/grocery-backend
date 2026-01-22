@@ -181,16 +181,17 @@ app.get("/product/:id", async (req, res) => {
 // Add Product (Protected)
 app.post("/product", authMiddleware, async (req, res) => {
   try {
-    const { name, quantity, expiryDate, notifyBeforeDays } = req.body;
+    const { name, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     // Validation
-    if (!name || !quantity || !expiryDate || !notifyBeforeDays) {
+    if (!name || !quantity || price === undefined || !expiryDate || !notifyBeforeDays) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
     const product = await Product.create({
       name,
       quantity,
+      price,
       expiryDate,
       notifyBeforeDays,
     });
@@ -204,11 +205,11 @@ app.post("/product", authMiddleware, async (req, res) => {
 // Update Product (Protected)
 app.put("/product/:id", authMiddleware, async (req, res) => {
   try {
-    const { name, quantity, expiryDate, notifyBeforeDays } = req.body;
+    const { name, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, quantity, expiryDate, notifyBeforeDays },
+      { name, quantity, price, expiryDate, notifyBeforeDays },
       { new: true, runValidators: true }
     );
 
