@@ -48,14 +48,29 @@ if (!MONGO_URI) {
   console.error("❌ CRITICAL: MONGO_URI is not defined in environment variables!");
 }
 
+// Optimization for Serverless (Vercel)
+mongoose.set("bufferCommands", false);
+
 mongoose
-  .connect(MONGO_URI)
+  .connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000, // Fail after 5 seconds instead of 10
+  })
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => {
-    console.error("❌ MongoDB Connection Error DETAILS:");
-    console.error("Message:", err.message);
-    console.error("Code:", err.code);
+    console.error("❌ MongoDB Connection Error:");
+    console.error(err.message);
   });
+
+// Middleware to check DB connection
+const checkDbConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      error: "Database not connected",
+      details: "The server is running but cannot reach MongoDB. Please check your MONGO_URI and IP Whitelist."
+    });
+  }
+  next();
+};
 
 // Health Check
 app.get("/health", (req, res) => {
@@ -71,7 +86,7 @@ app.get("/health", (req, res) => {
 // ========== ADMIN AUTHENTICATION ==========
 
 // Register Admin
-app.post("/admin/register", async (req, res) => {
+app.post("/admin/register", checkDbConnection, async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -124,7 +139,7 @@ app.post("/admin/register", async (req, res) => {
 });
 
 // Login Admin
-app.post("/admin/login", async (req, res) => {
+app.post("/admin/login", checkDbConnection, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -181,7 +196,7 @@ app.get("/admin/profile", authMiddleware, async (req, res) => {
 // ========== PRODUCT ENDPOINTS (Protected) ==========
 
 // Get All Products
-app.get("/products", async (req, res) => {
+app.get("/products", checkDbConnection, async (req, res) => {
   try {
     const products = await Product.find().sort({ expiryDate: 1 });
     res.json(products);
@@ -192,7 +207,7 @@ app.get("/products", async (req, res) => {
 });
 
 // Get Single Product
-app.get("/product/:id", async (req, res) => {
+app.get("/product/:id", checkDbConnection, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -205,7 +220,7 @@ app.get("/product/:id", async (req, res) => {
 });
 
 // Add Product (Protected)
-app.post("/product", authMiddleware, async (req, res) => {
+app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
   try {
     const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
@@ -230,7 +245,7 @@ app.post("/product", authMiddleware, async (req, res) => {
 });
 
 // Update Product (Protected)
-app.put("/product/:id", authMiddleware, async (req, res) => {
+app.put("/product/:id", authMiddleware, checkDbConnection, async (req, res) => {
   try {
     const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
@@ -251,7 +266,7 @@ app.put("/product/:id", authMiddleware, async (req, res) => {
 });
 
 // Delete Product (Protected)
-app.delete("/product/:id", authMiddleware, async (req, res) => {
+app.delete("/product/:id", authMiddleware, checkDbConnection, async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
 
@@ -268,7 +283,7 @@ app.delete("/product/:id", authMiddleware, async (req, res) => {
 // ========== USER/TOKEN ENDPOINTS ==========
 
 // Save FCM Token
-app.post("/token", async (req, res) => {
+app.post("/token", checkDbConnection, async (req, res) => {
   try {
     const { token } = req.body;
 
