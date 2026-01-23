@@ -255,7 +255,7 @@ app.get("/product/:id", checkDbConnection, async (req, res) => {
 // Add Product (Protected)
 app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
   try {
-    const { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, subcategory, quantity, weight, price, expiryDate, notifyBeforeDays } = req.body;
 
     // Validation
     if (!name || !quantity || price === undefined || !expiryDate || !notifyBeforeDays) {
@@ -285,6 +285,7 @@ app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
       category,
       subcategory,
       quantity,
+      weight,
       price,
       expiryDate,
       notifyBeforeDays,
@@ -299,11 +300,11 @@ app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
 // Update Product (Protected)
 app.put("/product/:id", authMiddleware, checkDbConnection, async (req, res) => {
   try {
-    const { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, subcategory, quantity, weight, price, expiryDate, notifyBeforeDays } = req.body;
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays },
+      { name, category, subcategory, quantity, weight, price, expiryDate, notifyBeforeDays },
       { new: true, runValidators: true }
     );
 

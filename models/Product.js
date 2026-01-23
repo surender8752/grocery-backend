@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema({
   category: String,
   subcategory: String,
   quantity: Number,
+  weight: Number,
   price: Number,
   expiryDate: Date,
   notifyBeforeDays: Number
