@@ -255,16 +255,35 @@ app.get("/product/:id", checkDbConnection, async (req, res) => {
 // Add Product (Protected)
 app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
   try {
-    const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     // Validation
     if (!name || !quantity || price === undefined || !expiryDate || !notifyBeforeDays) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    // Check for duplicate product (case-insensitive)
+    const existingProduct = await Product.findOne({
+      name: { $regex: new RegExp(`^${name}$`, 'i') }
+    });
+
+    if (existingProduct) {
+      return res.status(409).json({
+        error: "Duplicate product",
+        message: `Product "${name}" already exists in the inventory.`,
+        existingProduct: {
+          id: existingProduct._id,
+          name: existingProduct.name,
+          category: existingProduct.category,
+          quantity: existingProduct.quantity
+        }
+      });
+    }
+
     const product = await Product.create({
       name,
       category,
+      subcategory,
       quantity,
       price,
       expiryDate,
@@ -280,11 +299,11 @@ app.post("/product", authMiddleware, checkDbConnection, async (req, res) => {
 // Update Product (Protected)
 app.put("/product/:id", authMiddleware, checkDbConnection, async (req, res) => {
   try {
-    const { name, category, quantity, price, expiryDate, notifyBeforeDays } = req.body;
+    const { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays } = req.body;
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, category, quantity, price, expiryDate, notifyBeforeDays },
+      { name, category, subcategory, quantity, price, expiryDate, notifyBeforeDays },
       { new: true, runValidators: true }
     );
 
