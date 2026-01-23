@@ -4,6 +4,9 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const csv = require("csv-parser");
+const { Readable } = require("stream");
 require("./cron");
 
 const Product = require("./models/Product");
@@ -40,6 +43,19 @@ app.use(express.json());
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+
+// Configure Multer for CSV uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;
@@ -356,6 +372,145 @@ app.delete("/product/:id", authMiddleware, checkDbConnection, async (req, res) =
     res.json({ message: "Product Deleted" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete product", details: error.message });
+  }
+});
+
+// Upload Products from CSV (Protected)
+app.post("/products/upload-csv", authMiddleware, upload.single('csvFile'), checkDbConnection, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const results = [];
+    const errors = [];
+    const skipped = [];
+    let lineNumber = 1; // Start from 1 (header is line 0)
+
+    // Convert buffer to readable stream
+    const bufferStream = Readable.from(req.file.buffer.toString());
+
+    // Parse CSV
+    await new Promise((resolve, reject) => {
+      bufferStream
+        .pipe(csv())
+        .on('data', (data) => {
+          lineNumber++;
+          results.push({ ...data, lineNumber });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (results.length === 0) {
+      return res.status(400).json({ error: "CSV file is empty or invalid" });
+    }
+
+    const successfulProducts = [];
+
+    // Process each row
+    for (const row of results) {
+      try {
+        const { name, category, subcategory, quantity, weight, price, expiryDate, notifyBeforeDays } = row;
+
+        // Validate required fields
+        if (!name || !quantity || price === undefined || !expiryDate || !notifyBeforeDays) {
+          errors.push({
+            line: row.lineNumber,
+            data: row,
+            error: "Missing required fields (name, quantity, price, expiryDate, notifyBeforeDays)"
+          });
+          continue;
+        }
+
+        // Validate data types
+        const parsedQuantity = Number(quantity);
+        const parsedWeight = weight ? Number(weight) : undefined;
+        const parsedPrice = Number(price);
+        const parsedNotifyDays = Number(notifyBeforeDays);
+
+        if (isNaN(parsedQuantity) || isNaN(parsedPrice) || isNaN(parsedNotifyDays)) {
+          errors.push({
+            line: row.lineNumber,
+            data: row,
+            error: "Invalid number format for quantity, price, or notifyBeforeDays"
+          });
+          continue;
+        }
+
+        if (parsedWeight !== undefined && isNaN(parsedWeight)) {
+          errors.push({
+            line: row.lineNumber,
+            data: row,
+            error: "Invalid number format for weight"
+          });
+          continue;
+        }
+
+        // Validate date
+        const parsedDate = new Date(expiryDate);
+        if (isNaN(parsedDate.getTime())) {
+          errors.push({
+            line: row.lineNumber,
+            data: row,
+            error: "Invalid date format for expiryDate (use YYYY-MM-DD)"
+          });
+          continue;
+        }
+
+        // Check for duplicate (case-insensitive)
+        const existingProduct = await Product.findOne({
+          name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+        });
+
+        if (existingProduct) {
+          skipped.push({
+            line: row.lineNumber,
+            name: name,
+            reason: "Product already exists"
+          });
+          continue;
+        }
+
+        // Create product
+        const product = await Product.create({
+          name: name.trim(),
+          category: category?.trim() || '',
+          subcategory: subcategory?.trim() || '',
+          quantity: parsedQuantity,
+          weight: parsedWeight,
+          price: parsedPrice,
+          expiryDate: parsedDate,
+          notifyBeforeDays: parsedNotifyDays
+        });
+
+        successfulProducts.push(product);
+
+      } catch (error) {
+        errors.push({
+          line: row.lineNumber,
+          data: row,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: "CSV processing completed",
+      summary: {
+        total: results.length,
+        successful: successfulProducts.length,
+        failed: errors.length,
+        skipped: skipped.length
+      },
+      successfulProducts,
+      errors,
+      skipped
+    });
+
+  } catch (error) {
+    console.error("CSV upload error:", error);
+    res.status(500).json({ error: "Failed to process CSV file", details: error.message });
   }
 });
 
