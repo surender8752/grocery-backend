@@ -239,6 +239,32 @@ app.get("/products", checkDbConnection, async (req, res) => {
   }
 });
 
+// Search Products
+app.get("/products/search", checkDbConnection, async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim() === "") {
+      return res.json([]);
+    }
+
+    const searchRegex = new RegExp(q.trim(), "i");
+
+    const products = await Product.find({
+      $or: [
+        { name: searchRegex },
+        { category: searchRegex },
+        { subcategory: searchRegex }
+      ]
+    }).sort({ expiryDate: 1 });
+
+    res.json(products);
+  } catch (error) {
+    console.error("Search products error:", error);
+    res.status(500).json({ error: "Failed to search products", details: error.message });
+  }
+});
+
 // Get Single Product
 app.get("/product/:id", checkDbConnection, async (req, res) => {
   try {
